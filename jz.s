@@ -56,7 +56,9 @@ _start:
 
 	sub	sp, #0x400		// allocate 256 x 32-bit for locals
 	mov	r7, sp			// set locals pointer
-	mov	r8, sp			// set constants pointer
+	adr	r0, bytecode
+	str	r0, [r7, #0]		// local 0 = bytecode base
+					// program base can be determined by & ~0xfff
 
 	strb	r0, [sp]		// probe the newly allocated memory, to
 					// ensure that any page fault happens *now*,
@@ -64,8 +66,8 @@ _start:
 
 	mov	r1, #0
 loopidoo:
-	ldr	r0, =0xbeee000		// install opcode handlers, defaults first
-	orr	r0, r1, lsl #2
+	ldr	r0, =0xbee0000		// install opcode handlers, defaults first
+	orr	r0, r1, lsl #4
 	str	r0, [r5, r1, lsl #2]
 	add	r1, #1
 	cmp	r1, #0x108
@@ -73,27 +75,17 @@ loopidoo:
 
 	adr	r0, syscall		// install opcode handlers
 	str	r0, [r5, #0xfe*4]	// impdep1 = syscall
-	str	r0, [r5, #0xac*4]	// impdep1 = syscall
-	#adr	r0, enter_jz
-	#str	r0, [r5, #0x410]	// config invalid handler
-	#ldr	r0, =0xbead000
-	#str	r0, [r5, #0x400]
 
-	mov	r0, #0
-	mov	r1, #0
-	mov	r2, #0
-	mov	r3, #0
+	adr	lr, bytecode		// set our entry point
 
 
 # Then, Jazelle entry
 
 enter_jz:
-	mrc	p14, 7, r4, c0, c0, 0	// read the ID for good luck
 	mov	r0, #1
 	mcr	p14, 7, r0, c2, c0, 0	// Set 'Jazelle Enabled' bit
 
 	adr	r12, jz_unavailable
-	adr	lr, bytecode
 	bxj	r12
 
 
@@ -129,14 +121,29 @@ syscall:				// The syscall handler
 	sub	r6, r12, lsl #2		// adjust the operand stack
 	str	r0, [r5, #-4]		// store the return value
 
-sysend:	b	sysend
+	add	lr, #2			// skip this instruction
+	b	enter_jz		// and return to Java
+
+	.ltorg				// Put constant pool here
 
 
 # At offset 256, bytecode!
 
-	.org 256
+	.org 256 - 16
 bytecode:
+	// write the well-known message
+	.byte 0x10, 13			// 0  bipush length
+	.byte 0x1a			// 1  iload_0 = load BASE from locals
+	.byte 0x10, 0x10		// 2  bipush offset of string
+	.byte 0x60			// 3  iadd
+	.byte 0x04			// 2  iconst_1 = stdout
+	.byte 0x07			// 3  iconst_4 = SYS_write
+	.byte 0xfe, 3			// 4  syscall3 (fe 03)
+	.byte 0x57			// 1  pop
+
 	// exit
 	.byte 0x10, 42			// 0  bipush 42
 	.byte 0x04			// 1  iconst_1 = SYS_exit
 	.byte 0xfe, 1 			// 2  syscall1 (fe 01)
+
+	.ascii	"Hello World!\n"

@@ -49,24 +49,22 @@ A _hello world_ in JVM assembly:
 (the numbers on the left are the current stack depth)
 
 ```
-// write the well-known message
-0   bipush length
+        // write the well-known message
+        .byte 0x10, 13                  // 0  bipush length
+        .byte 0x1a                      // 1  iload_0 = load BASE from locals
+        .byte 0x10, 0x10                // 2  bipush offset of string
+        .byte 0x60                      // 3  iadd
+        .byte 0x04                      // 2  iconst_1 = stdout
+        .byte 0x07                      // 3  iconst_4 = SYS_write
+        .byte 0xfe, 3                   // 4  syscall3 (fe 03)
+        .byte 0x57                      // 1  pop
 
-1   load BASE from locals
-2   sipush offset of string
-3   iadd
+        // exit
+        .byte 0x10, 42                  // 0  bipush 42
+        .byte 0x04                      // 1  iconst_1 = SYS_exit
+        .byte 0xfe, 1                   // 2  syscall1 (fe 01)
 
-2   bipush 1 = stdout
-
-3   iconst_4 = SYS_write
-
-4   syscall3 (fe 03)
-1   pop
-
-// exit
-0   bipush 42
-1   iconst_1 = SYS_exit
-2   syscall1 (fe 01)
+        .ascii  "Hello World!\n"
 ```
 
 
